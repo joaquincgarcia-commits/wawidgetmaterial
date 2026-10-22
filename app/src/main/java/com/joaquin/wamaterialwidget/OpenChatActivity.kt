@@ -6,48 +6,23 @@ import android.os.Bundle
 
 /**
  * Trampoline for widget message taps. It lives in its own task (separate
- * taskAffinity, singleInstance) and is fully transparent. The work happens
- * in onResume - when this activity is genuinely in the foreground - because
- * sending another app's notification PendingIntent from a background or
- * not-yet-resumed context is silently blocked by Android's background
- * activity-start rules. From here, the send opens that exact WhatsApp chat;
- * if the conversation is gone or its intent died, WhatsApp's main screen
- * opens instead. Either way, finish() returns to the launcher, never to
- * this app's own screens.
+ * taskAffinity, singleInstance) and is fully transparent; in onResume -
+ * genuinely in the foreground - it simply opens WhatsApp's main screen
+ * with a plain activity start, which is always allowed.
+ *
+ * Opening the exact chat by sending the conversation's notification
+ * PendingIntent was dropped: on this device those sends fail silently
+ * (no exception, no activity), and treating them as success prevented
+ * any fallback from running.
  */
 class OpenChatActivity : Activity() {
 
     private var handled = false
-    private var conversationKey: String? = null
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        conversationKey = intent?.getStringExtra(EXTRA_CONVERSATION_KEY)
-    }
 
     override fun onResume() {
         super.onResume()
         if (handled) return
         handled = true
-        openTarget()
-        finish()
-    }
-
-    private fun openTarget() {
-        val key = conversationKey
-        if (!key.isNullOrBlank()) {
-            WaReconciler.reconcile(this)
-            val stillUnread = WaStore.load(this).any { it.key == key }
-            val pendingIntent = if (stillUnread) WaIntents.get(key) else null
-            if (pendingIntent != null) {
-                try {
-                    pendingIntent.send()
-                    return
-                } catch (e: Exception) {
-                    // Dead intent: fall through to WhatsApp's main screen.
-                }
-            }
-        }
         try {
             val launch = packageManager.getLaunchIntentForPackage("com.whatsapp")
                 ?: packageManager.getLaunchIntentForPackage("com.whatsapp.w4b")
@@ -57,6 +32,7 @@ class OpenChatActivity : Activity() {
         } catch (e: Exception) {
             // WhatsApp not installed / not launchable: nothing to do.
         }
+        finish()
     }
 
     companion object {

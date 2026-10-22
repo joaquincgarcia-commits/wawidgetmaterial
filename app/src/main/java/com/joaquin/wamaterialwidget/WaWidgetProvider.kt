@@ -212,9 +212,9 @@ object WaWidgetUpdater {
         fun color(resId: Int) = context.getColor(resId)
         return if (night) {
             WaPalette(
-                background = color(android.R.color.system_accent1_700),
+                background = color(android.R.color.system_accent1_800),
                 onBackground = color(android.R.color.system_accent1_100),
-                onBackgroundVariant = color(android.R.color.system_neutral2_400),
+                onBackgroundVariant = color(android.R.color.system_neutral2_200),
                 pillBackground = color(android.R.color.system_accent2_700),
                 pillText = color(android.R.color.system_accent2_100),
                 divider = color(android.R.color.system_accent1_600)
