@@ -31,6 +31,7 @@ object WaIntents {
     fun put(key: String, intent: PendingIntent) { map[key] = intent }
     fun get(key: String): PendingIntent? = map[key]
     fun remove(key: String) { map.remove(key) }
+    fun retainKeys(keys: Set<String>) { map.keys.retainAll(keys) }
 }
 
 /** Tiny JSON-file-backed store for the current unread conversations. */
@@ -76,6 +77,10 @@ object WaStore {
     fun remove(context: Context, key: String) {
         val current = load(context).toMutableList()
         if (current.removeAll { it.key == key }) save(context, current)
+    }
+
+    fun replaceAll(context: Context, list: List<WaConversation>) {
+        save(context, list.sortedByDescending { it.timestamp })
     }
 
     private fun save(context: Context, list: List<WaConversation>) = synchronized(lock) {

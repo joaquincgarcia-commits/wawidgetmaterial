@@ -43,6 +43,7 @@ class OpenWhatsAppAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
+        if (WaReconciler.reconcile(context)) WaReconciler.refreshWidget(context)
         openWhatsAppHome(context)
     }
 }
@@ -59,8 +60,14 @@ class OpenChatAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
+        // If the chat was already read, its notification is gone: clean the
+        // store and fall back to WhatsApp's main screen instead of trying to
+        // send a dead PendingIntent.
+        val changed = WaReconciler.reconcile(context)
+        if (changed) WaReconciler.refreshWidget(context)
         val key = parameters[ConversationKey]
-        val pendingIntent = key?.let { WaIntents.get(it) }
+        val stillUnread = key != null && WaStore.load(context).any { it.key == key }
+        val pendingIntent = if (stillUnread) WaIntents.get(key!!) else null
         if (pendingIntent != null) {
             try {
                 pendingIntent.send()
@@ -96,6 +103,9 @@ class WaWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Responsive(setOf(CompactSize, MediumSize))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        // Self-heal against the system's current notifications before
+        // rendering: a chat that was already read must not render as unread.
+        WaReconciler.reconcile(context)
         val conversations = WaStore.load(context)
         provideContent {
             GlanceTheme {
@@ -116,7 +126,6 @@ private fun WidgetContent(conversations: List<WaConversation>) {
             .background(GlanceTheme.colors.widgetBackground)
             .cornerRadius(28.dp)
             .padding(16.dp)
-            .clickable(actionRunCallback<OpenWhatsAppAction>())
     ) {
         if (size.width < 180.dp) {
             CompactContent(conversations.size, totalUnread)
@@ -129,7 +138,8 @@ private fun WidgetContent(conversations: List<WaConversation>) {
 @Composable
 private fun CompactContent(chatCount: Int, totalUnread: Int) {
     Column(
-        modifier = GlanceModifier.fillMaxSize(),
+        modifier = GlanceModifier.fillMaxSize()
+            .clickable(actionRunCallback<OpenWhatsAppAction>()),
         verticalAlignment = Alignment.CenterVertically,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -184,7 +194,8 @@ private fun MediumContent(conversations: List<WaConversation>, totalUnread: Int)
     Column(modifier = GlanceModifier.fillMaxSize()) {
         // Header: text only (no logo), plus the status pill.
         Row(
-            modifier = GlanceModifier.fillMaxWidth(),
+            modifier = GlanceModifier.fillMaxWidth()
+                .clickable(actionRunCallback<OpenWhatsAppAction>()),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -250,7 +261,10 @@ private fun Pill(
 
 @Composable
 private fun EmptyState() {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        modifier = GlanceModifier.clickable(actionRunCallback<OpenWhatsAppAction>()),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
         Box(
             modifier = GlanceModifier
                 .size(44.dp)
@@ -302,24 +316,6 @@ private fun ConversationRow(conversation: WaConversation) {
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Circular avatar with initials (no contact photos).
-        Box(
-            modifier = GlanceModifier
-                .size(42.dp)
-                .background(GlanceTheme.colors.tertiaryContainer)
-                .cornerRadius(21.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = initialsOf(conversation.title),
-                style = TextStyle(
-                    color = GlanceTheme.colors.onSurface,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-        }
-        Spacer(GlanceModifier.width(10.dp))
         Column(modifier = GlanceModifier.defaultWeight()) {
             Row(modifier = GlanceModifier.fillMaxWidth()) {
                 Text(
@@ -372,16 +368,6 @@ private fun ConversationRow(conversation: WaConversation) {
                 )
             )
         }
-    }
-}
-
-private fun initialsOf(title: String): String {
-    val words = title.trim().split(Regex("\\s+")).filter { it.isNotBlank() }
-    if (words.isEmpty()) return "?"
-    return if (words.size == 1) {
-        words[0].take(2).uppercase(Locale.US)
-    } else {
-        (words[0].take(1) + words[1].take(1)).uppercase(Locale.US)
     }
 }
 
