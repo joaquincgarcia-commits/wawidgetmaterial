@@ -142,7 +142,7 @@ object WaWidgetUpdater {
         }
         collection.setHasStableIds(false)
         collection.setViewTypeCount(1)
-        views.setRemoteCollectionItems(R.id.rows_list, collection.build())
+        views.setRemoteAdapter(R.id.rows_list, collection.build())
         views.setPendingIntentTemplate(R.id.rows_list, openChatTemplate(context))
         views.setEmptyView(R.id.rows_list, R.id.empty_text)
         return views
