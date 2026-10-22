@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.content.res.Configuration
-import android.net.Uri
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.Gravity
@@ -86,22 +85,15 @@ object WaWidgetUpdater {
             val views = if (compact) {
                 buildCompact(context)
             } else {
-                buildMedium(context, appWidgetId)
+                buildMedium(context)
             }
             manager.updateAppWidget(appWidgetId, views)
-            if (!compact) {
-                try {
-                    manager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.rows_list)
-                } catch (e: Exception) {
-                    // Collection not attached yet.
-                }
-            }
         } catch (e: Exception) {
             // A failed render must never crash the caller (listener, receiver).
         }
     }
 
-    private fun buildMedium(context: Context, appWidgetId: Int): RemoteViews {
+    private fun buildMedium(context: Context): RemoteViews {
         val palette = palette(context)
         val conversations = WaStore.load(context)
         val feed = feedItems(conversations)
@@ -141,11 +133,16 @@ object WaWidgetUpdater {
         )
         views.setTextColor(R.id.header_subtitle, palette.onBackgroundVariant)
 
-        val adapterIntent = Intent(context, WaWidgetViewsService::class.java).apply {
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-            data = Uri.parse("wawidget://factory/$appWidgetId")
+        // Items are delivered inline with the widget update (RemoteCollectionItems,
+        // Android 12+): the list scrolls without any background service that
+        // could fail to bind in the launcher.
+        val collection = RemoteViews.RemoteCollectionItems.Builder()
+        for ((index, item) in feed.take(100).withIndex()) {
+            collection.addItem((index + 1).toLong(), buildRow(context, item, palette))
         }
-        views.setRemoteAdapter(R.id.rows_list, adapterIntent)
+        collection.setHasStableIds(false)
+        collection.setViewTypeCount(1)
+        views.setRemoteCollectionItems(R.id.rows_list, collection.build())
         views.setPendingIntentTemplate(R.id.rows_list, openChatTemplate(context))
         views.setEmptyView(R.id.rows_list, R.id.empty_text)
         return views
@@ -228,6 +225,26 @@ object WaWidgetUpdater {
         }
     }
 
+
+
+    fun buildRow(context: Context, item: FeedItem, palette: WaPalette): RemoteViews {
+        val row = RemoteViews(context.packageName, R.layout.wa_widget_row)
+        row.setTextViewText(R.id.row_title, item.title)
+        row.setTextColor(R.id.row_title, palette.onBackground)
+        val body = if (item.isGroup && !item.sender.isNullOrBlank()) {
+            "${item.sender}: ${item.text}"
+        } else {
+            item.text
+        }
+        row.setTextViewText(R.id.row_text, body)
+        row.setTextColor(R.id.row_text, palette.onBackgroundVariant)
+        row.setTextViewText(R.id.row_time, formatTime(item.timestamp))
+        row.setTextColor(R.id.row_time, palette.onBackgroundVariant)
+        row.setInt(R.id.row_divider, "setBackgroundColor", palette.divider)
+        val fillIn = Intent().putExtra(OpenChatActivity.EXTRA_CONVERSATION_KEY, item.conversationKey)
+        row.setOnClickFillInIntent(R.id.row_root, fillIn)
+        return row
+    }
 
     private fun openChatTemplate(context: Context): PendingIntent {
         val intent = Intent(context, OpenChatActivity::class.java)

@@ -98,6 +98,23 @@ class WaNotificationListenerService : NotificationListenerService() {
             }
         }
         if (parsedMessages.isEmpty()) {
+            // WhatsApp also uses InboxStyle for some notifications: the unread
+            // messages arrive as plain text lines instead of MessagingStyle
+            // bundles. Read those too, so no message is dropped.
+            @Suppress("DEPRECATION")
+            val lines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            if (!lines.isNullOrEmpty()) {
+                lines.forEachIndexed { index, line ->
+                    val text = line?.toString()?.trim().orEmpty()
+                    if (text.isNotBlank()) {
+                        parsedMessages.add(
+                            WaMessage(text = text, sender = null, timestamp = sbn.postTime + index)
+                        )
+                    }
+                }
+            }
+        }
+        if (parsedMessages.isEmpty()) {
             val text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
                 ?: extras.getCharSequence(Notification.EXTRA_TEXT))
                 ?.toString()?.trim().orEmpty()
