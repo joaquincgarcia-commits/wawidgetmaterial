@@ -15,6 +15,7 @@ import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
@@ -103,13 +104,6 @@ class WaWidget : GlanceAppWidget() {
         }
     }
 
-    override suspend fun providePreview(context: Context, widgetCategory: Int) {
-        provideContent {
-            GlanceTheme {
-                WidgetContent(emptyList())
-            }
-        }
-    }
 }
 
 @Composable
