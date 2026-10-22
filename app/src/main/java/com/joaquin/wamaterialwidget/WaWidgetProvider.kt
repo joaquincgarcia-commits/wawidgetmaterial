@@ -48,7 +48,7 @@ class WaWidgetReceiver : AppWidgetProvider() {
 }
 
 /** One row of the widget feed: a single unread message. */
-internal data class FeedItem(
+data class FeedItem(
     val conversationKey: String,
     val title: String,
     val isGroup: Boolean,
@@ -57,7 +57,7 @@ internal data class FeedItem(
     val timestamp: Long
 )
 
-internal data class WaPalette(
+data class WaPalette(
     val background: Int,
     val onBackground: Int,
     val onBackgroundVariant: Int,
