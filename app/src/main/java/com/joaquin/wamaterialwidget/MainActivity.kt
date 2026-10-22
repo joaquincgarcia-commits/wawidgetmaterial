@@ -58,6 +58,8 @@ class MainActivity : ComponentActivity() {
         accessEnabled = NotificationManagerCompat
             .getEnabledListenerPackages(this)
             .contains(packageName)
+        WaReconciler.reconcile(this)
+        WaWidgetUpdater.updateAll(this)
     }
 }
 

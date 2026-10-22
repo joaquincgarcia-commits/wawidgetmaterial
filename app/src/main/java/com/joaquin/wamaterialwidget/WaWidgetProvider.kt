@@ -8,6 +8,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.content.res.Configuration
+import android.graphics.Typeface
+import android.text.SpannableStringBuilder
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.Gravity
@@ -206,10 +212,10 @@ object WaWidgetUpdater {
         fun color(resId: Int) = context.getColor(resId)
         return if (night) {
             WaPalette(
-                background = color(android.R.color.system_accent2_900),
+                background = color(android.R.color.system_neutral2_800),
                 onBackground = color(android.R.color.system_neutral1_100),
                 onBackgroundVariant = color(android.R.color.system_neutral1_300),
-                pillBackground = color(android.R.color.system_accent1_800),
+                pillBackground = color(android.R.color.system_accent1_700),
                 pillText = color(android.R.color.system_accent1_100),
                 divider = color(android.R.color.system_neutral1_700)
             )
@@ -228,19 +234,29 @@ object WaWidgetUpdater {
 
 
     fun buildRow(context: Context, item: FeedItem, palette: WaPalette): RemoteViews {
+        // One single TextView per item, with styled spans. Deliberately the
+        // simplest possible item view: nested layouts with weights failed to
+        // inflate as collection items in the launcher.
         val row = RemoteViews(context.packageName, R.layout.wa_widget_row)
-        row.setTextViewText(R.id.row_title, item.title)
-        row.setTextColor(R.id.row_title, palette.onBackground)
         val body = if (item.isGroup && !item.sender.isNullOrBlank()) {
             "${item.sender}: ${item.text}"
         } else {
             item.text
         }
-        row.setTextViewText(R.id.row_text, body)
-        row.setTextColor(R.id.row_text, palette.onBackgroundVariant)
-        row.setTextViewText(R.id.row_time, formatTime(item.timestamp))
-        row.setTextColor(R.id.row_time, palette.onBackgroundVariant)
-        row.setInt(R.id.row_divider, "setBackgroundColor", palette.divider)
+        val text = SpannableStringBuilder()
+        val titleStart = text.length
+        text.append(item.title)
+        text.setSpan(StyleSpan(Typeface.BOLD), titleStart, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(RelativeSizeSpan(1.08f), titleStart, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.append("   ")
+        val timeStart = text.length
+        text.append(formatTime(item.timestamp))
+        text.setSpan(ForegroundColorSpan(palette.onBackgroundVariant), timeStart, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.setSpan(RelativeSizeSpan(0.85f), timeStart, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        text.append("\n")
+        text.append(body)
+        row.setTextViewText(R.id.row_root, text)
+        row.setTextColor(R.id.row_root, palette.onBackground)
         val fillIn = Intent().putExtra(OpenChatActivity.EXTRA_CONVERSATION_KEY, item.conversationKey)
         row.setOnClickFillInIntent(R.id.row_root, fillIn)
         return row

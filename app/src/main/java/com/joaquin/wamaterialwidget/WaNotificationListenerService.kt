@@ -1,7 +1,10 @@
 package com.joaquin.wamaterialwidget
 
 import android.app.Notification
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.Context
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
@@ -13,6 +16,40 @@ import android.service.notification.StatusBarNotification
  * The app declares no INTERNET permission: nothing ever leaves the device.
  */
 class WaNotificationListenerService : NotificationListenerService() {
+
+    private var themeReceiver: BroadcastReceiver? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        // Repaint the widget when the wallpaper or the system theme changes,
+        // not only when a new message arrives.
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                WaWidgetUpdater.updateAll(applicationContext)
+            }
+        }
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_WALLPAPER_CHANGED)
+            addAction(Intent.ACTION_CONFIGURATION_CHANGED)
+        }
+        try {
+            registerReceiver(receiver, filter)
+            themeReceiver = receiver
+        } catch (e: Exception) {
+            // Best effort only.
+        }
+    }
+
+    override fun onDestroy() {
+        themeReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (e: Exception) {
+                // Already unregistered.
+            }
+        }
+        super.onDestroy()
+    }
 
     override fun onListenerConnected() {
         WaListenerRef.instance = this
