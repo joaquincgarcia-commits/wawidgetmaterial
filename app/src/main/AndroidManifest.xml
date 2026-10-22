@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Package visibility (Android 11+): without this, the system hides
+         WhatsApp from this app and getLaunchIntentForPackage returns null. -->
+    <queries>
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+    </queries>
+
     <!-- Deliberately NO android.permission.INTERNET: everything runs on-device. -->
 
     <application
@@ -36,8 +43,10 @@
             android:name=".OpenChatActivity"
             android:excludeFromRecents="true"
             android:exported="true"
+            android:launchMode="singleInstance"
             android:noHistory="true"
-            android:theme="@android:style/Theme.NoDisplay" />
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <service
             android:name=".WaNotificationListenerService"

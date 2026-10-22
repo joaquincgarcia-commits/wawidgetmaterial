@@ -212,21 +212,21 @@ object WaWidgetUpdater {
         fun color(resId: Int) = context.getColor(resId)
         return if (night) {
             WaPalette(
-                background = color(android.R.color.system_neutral2_800),
-                onBackground = color(android.R.color.system_neutral1_100),
-                onBackgroundVariant = color(android.R.color.system_neutral1_300),
-                pillBackground = color(android.R.color.system_accent1_700),
-                pillText = color(android.R.color.system_accent1_100),
-                divider = color(android.R.color.system_neutral1_700)
+                background = color(android.R.color.system_accent1_700),
+                onBackground = color(android.R.color.system_accent1_100),
+                onBackgroundVariant = color(android.R.color.system_neutral2_400),
+                pillBackground = color(android.R.color.system_accent2_700),
+                pillText = color(android.R.color.system_accent2_100),
+                divider = color(android.R.color.system_accent1_600)
             )
         } else {
             WaPalette(
-                background = color(android.R.color.system_accent2_100),
-                onBackground = color(android.R.color.system_neutral1_900),
-                onBackgroundVariant = color(android.R.color.system_neutral1_600),
-                pillBackground = color(android.R.color.system_accent1_200),
-                pillText = color(android.R.color.system_accent1_900),
-                divider = color(android.R.color.system_neutral1_300)
+                background = color(android.R.color.system_accent1_100),
+                onBackground = color(android.R.color.system_accent1_900),
+                onBackgroundVariant = color(android.R.color.system_neutral2_700),
+                pillBackground = color(android.R.color.system_accent2_100),
+                pillText = color(android.R.color.system_accent2_900),
+                divider = color(android.R.color.system_accent1_300)
             )
         }
     }
