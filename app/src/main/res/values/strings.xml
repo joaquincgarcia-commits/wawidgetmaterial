@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WhatsApp Material Widget</string>
+    <string name="widget_description">Unread WhatsApp messages in Material You style, with dynamic color</string>
+</resources>
