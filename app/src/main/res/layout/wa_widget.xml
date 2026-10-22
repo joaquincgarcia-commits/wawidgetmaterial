@@ -49,11 +49,12 @@
         android:layout_marginTop="8dp"
         android:layout_weight="1">
 
-        <LinearLayout
-            android:id="@+id/rows_container"
+        <ListView
+            android:id="@+id/rows_list"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical" />
+            android:layout_height="match_parent"
+            android:divider="@null"
+            android:dividerHeight="0dp" />
 
         <TextView
             android:id="@+id/empty_text"

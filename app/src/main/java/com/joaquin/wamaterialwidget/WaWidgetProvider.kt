@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.Gravity
@@ -47,7 +48,7 @@ class WaWidgetReceiver : AppWidgetProvider() {
 }
 
 /** One row of the widget feed: a single unread message. */
-private data class FeedItem(
+internal data class FeedItem(
     val conversationKey: String,
     val title: String,
     val isGroup: Boolean,
@@ -56,7 +57,7 @@ private data class FeedItem(
     val timestamp: Long
 )
 
-private data class WaPalette(
+internal data class WaPalette(
     val background: Int,
     val onBackground: Int,
     val onBackgroundVariant: Int,
@@ -81,20 +82,26 @@ object WaWidgetUpdater {
         try {
             val options = manager.getAppWidgetOptions(appWidgetId)
             val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
-            val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 140)
-            val views = if (minWidth < 190) {
+            val compact = minWidth < 190
+            val views = if (compact) {
                 buildCompact(context)
             } else {
-                val maxRows = ((minHeight - 92) / 46).coerceIn(2, 8)
-                buildMedium(context, maxRows)
+                buildMedium(context, appWidgetId)
             }
             manager.updateAppWidget(appWidgetId, views)
+            if (!compact) {
+                try {
+                    manager.notifyAppWidgetViewDataChanged(appWidgetId, R.id.rows_list)
+                } catch (e: Exception) {
+                    // Collection not attached yet.
+                }
+            }
         } catch (e: Exception) {
             // A failed render must never crash the caller (listener, receiver).
         }
     }
 
-    private fun buildMedium(context: Context, maxRows: Int): RemoteViews {
+    private fun buildMedium(context: Context, appWidgetId: Int): RemoteViews {
         val palette = palette(context)
         val conversations = WaStore.load(context)
         val feed = feedItems(conversations)
@@ -109,7 +116,7 @@ object WaWidgetUpdater {
         if (feed.isEmpty()) {
             views.setViewVisibility(R.id.header_pill, View.GONE)
             views.setViewVisibility(R.id.header_subtitle, View.GONE)
-            views.setViewVisibility(R.id.rows_container, View.GONE)
+            views.setViewVisibility(R.id.rows_list, View.GONE)
             views.setViewVisibility(R.id.empty_text, View.VISIBLE)
             views.setTextColor(R.id.empty_text, palette.onBackgroundVariant)
             views.setOnClickPendingIntent(R.id.empty_text, openWhatsApp)
@@ -117,7 +124,7 @@ object WaWidgetUpdater {
         }
 
         views.setViewVisibility(R.id.empty_text, View.GONE)
-        views.setViewVisibility(R.id.rows_container, View.VISIBLE)
+        views.setViewVisibility(R.id.rows_list, View.VISIBLE)
         views.setViewVisibility(R.id.header_pill, View.VISIBLE)
         views.setViewVisibility(R.id.header_subtitle, View.VISIBLE)
         views.setTextViewText(R.id.header_pill, "${feed.size} new")
@@ -134,36 +141,13 @@ object WaWidgetUpdater {
         )
         views.setTextColor(R.id.header_subtitle, palette.onBackgroundVariant)
 
-        views.removeAllViews(R.id.rows_container)
-        val shown = feed.take(maxRows)
-        for (item in shown) {
-            val row = RemoteViews(context.packageName, R.layout.wa_widget_row)
-            row.setTextViewText(R.id.row_title, item.title)
-            row.setTextColor(R.id.row_title, palette.onBackground)
-            val body = if (item.isGroup && !item.sender.isNullOrBlank()) {
-                "${item.sender}: ${item.text}"
-            } else {
-                item.text
-            }
-            row.setTextViewText(R.id.row_text, body)
-            row.setTextColor(R.id.row_text, palette.onBackgroundVariant)
-            row.setTextViewText(R.id.row_time, formatTime(item.timestamp))
-            row.setTextColor(R.id.row_time, palette.onBackgroundVariant)
-            row.setInt(R.id.row_divider, "setBackgroundColor", palette.divider)
-            // The notification's own PendingIntent opens this exact chat; if it
-            // is not in memory (e.g. right after a reboot), fall back to the
-            // WhatsApp home intent.
-            row.setOnClickPendingIntent(R.id.row_root, WaIntents.get(item.conversationKey) ?: openWhatsApp)
-            views.addView(R.id.rows_container, row)
+        val adapterIntent = Intent(context, WaWidgetViewsService::class.java).apply {
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+            data = Uri.parse("wawidget://factory/$appWidgetId")
         }
-        val extra = feed.size - shown.size
-        if (extra > 0) {
-            val more = RemoteViews(context.packageName, R.layout.wa_widget_more)
-            more.setTextViewText(R.id.more_text, "+$extra more")
-            more.setTextColor(R.id.more_text, palette.onBackgroundVariant)
-            more.setOnClickPendingIntent(R.id.more_text, openWhatsApp)
-            views.addView(R.id.rows_container, more)
-        }
+        views.setRemoteAdapter(R.id.rows_list, adapterIntent)
+        views.setPendingIntentTemplate(R.id.rows_list, openChatTemplate(context))
+        views.setEmptyView(R.id.rows_list, R.id.empty_text)
         return views
     }
 
@@ -195,7 +179,7 @@ object WaWidgetUpdater {
         return views
     }
 
-    private fun feedItems(conversations: List<WaConversation>): List<FeedItem> {
+    fun feedItems(conversations: List<WaConversation>): List<FeedItem> {
         val items = ArrayList<FeedItem>()
         for (conversation in conversations) {
             val messages = if (conversation.messages.isNotEmpty()) {
@@ -219,7 +203,7 @@ object WaWidgetUpdater {
         return items.sortedByDescending { it.timestamp }
     }
 
-    private fun palette(context: Context): WaPalette {
+    fun palette(context: Context): WaPalette {
         val night = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
             Configuration.UI_MODE_NIGHT_YES
         fun color(resId: Int) = context.getColor(resId)
@@ -244,6 +228,18 @@ object WaWidgetUpdater {
         }
     }
 
+
+    private fun openChatTemplate(context: Context): PendingIntent {
+        val intent = Intent(context, OpenChatActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return PendingIntent.getActivity(
+            context,
+            7,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+    }
+
     private fun openWhatsAppPendingIntent(context: Context): PendingIntent {
         val launchIntent = context.packageManager.getLaunchIntentForPackage("com.whatsapp")
             ?: context.packageManager.getLaunchIntentForPackage("com.whatsapp.w4b")
@@ -257,7 +253,7 @@ object WaWidgetUpdater {
         )
     }
 
-    private fun formatTime(timestamp: Long): String {
+    fun formatTime(timestamp: Long): String {
         val now = Calendar.getInstance()
         val then = Calendar.getInstance().apply { timeInMillis = timestamp }
         val sameDay = now.get(Calendar.YEAR) == then.get(Calendar.YEAR) &&
